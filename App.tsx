@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import type { Novel, NovelVersion } from './types';
 import { View } from './types';
 import { ManuscriptView } from './components/ManuscriptView';
 import { CharactersView } from './components/CharactersView';
 import { OutlineView } from './components/OutlineView';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
-import { BookIcon, UsersIcon, ListIcon, HistoryIcon, ExportIcon } from './components/icons';
+import { BookIcon, UsersIcon, ListIcon, HistoryIcon, ExportIcon, ImportIcon } from './components/icons';
 
 const initialNovel: Novel = {
   title: "Untitled Novel",
@@ -58,6 +58,7 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<View>(View.MANUSCRIPT);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const handleSetNovel = useCallback((newNovelState: React.SetStateAction<Novel>) => {
       setNovel(newNovelState);
@@ -95,6 +96,50 @@ const App: React.FC = () => {
     setIsHistoryModalOpen(false);
     // Trigger a save of the reverted state to mark it as the current version
     handleSaveNovel();
+  };
+
+  const handleImportNovel = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/json') {
+      alert('Please select a valid JSON file.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result;
+        if (typeof text !== 'string') throw new Error('Failed to read file content.');
+        
+        const importedNovel = JSON.parse(text);
+
+        // Basic validation
+        if (
+          typeof importedNovel.title !== 'string' ||
+          !Array.isArray(importedNovel.chapters) ||
+          !Array.isArray(importedNovel.characters) ||
+          !Array.isArray(importedNovel.outline)
+        ) {
+          throw new Error('Invalid novel file format.');
+        }
+        
+        if (window.confirm('Importing this file will replace your current novel. Are you sure you want to continue?')) {
+          setNovel(importedNovel as Novel);
+        }
+      } catch (error) {
+        console.error("Failed to import novel:", error);
+        alert(`Could not import the novel. Please ensure it's a valid novel JSON file. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        if (event.target) event.target.value = '';
+      }
+    };
+    reader.readAsText(file);
   };
   
   const handleExportNovel = () => {
@@ -148,6 +193,22 @@ const App: React.FC = () => {
                 aria-label="Novel Title"
             />
             <div className="flex items-center gap-2 flex-shrink-0">
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="application/json"
+                    className="hidden"
+                    aria-hidden="true"
+                />
+                <button
+                    onClick={handleImportNovel}
+                    className="p-2 rounded-md font-semibold text-slate-300 bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                    aria-label="Import novel"
+                >
+                    <ImportIcon />
+                    Import
+                </button>
                 <button
                     onClick={handleExportNovel}
                     className="p-2 rounded-md font-semibold text-slate-300 bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2"
