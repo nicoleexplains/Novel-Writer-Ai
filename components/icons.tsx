@@ -83,3 +83,21 @@ export const LightBulbIcon: React.FC<IconProps> = ({ className }) => (
       <path d="M10 2a1 1 0 011 1v1.017a1 1 0 01.621.928 6.002 6.002 0 013.932 5.024C15.86 13.62 14.534 16 12 16a4.002 4.002 0 01-4-4 1 1 0 10-2 0 6.002 6.002 0 006 6c3.314 0 6-2.686 6-6a8.003 8.003 0 00-4.732-7.234 3.001 3.001 0 00-1.646-5.729A1 1 0 0110 2zM9 19a1 1 0 011-1h0a1 1 0 011 1v.013a1 1 0 01-1 1h0a1 1 0 01-1-1V19z" />
     </svg>
 );
+
+export const DocumentTextIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-5 w-5"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+);
+
+export const ChevronUpIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-5 w-5"} viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+  </svg>
+);
+
+export const ChevronDownIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-5 w-5"} viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+  </svg>
+);

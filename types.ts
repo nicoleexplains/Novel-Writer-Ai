@@ -8,6 +8,7 @@ export interface Chapter {
   id: string;
   title: string;
   content: string;
+  summary?: string;
 }
 
 export interface Character {

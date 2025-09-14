@@ -21,6 +21,7 @@ export const generateCharacter = async (
     **Novel Title:** ${novelContext.title}
 
     **Story Outline Context:**
+    The following is the plot of the story. The new character must have a role that makes sense within this plot.
     ${novelContext.outline.map(p => `- ${p.title}: ${p.description}`).join('\n') || 'No outline defined yet.'}
 
     **Existing Characters Context:**
@@ -28,18 +29,19 @@ export const generateCharacter = async (
 
     ---
 
-    **User's Request:** "${prompt}"
+    **User's Request for a new character:** "${prompt}"
 
     ---
 
     **Your Task:**
-    Based *heavily* on the context provided (title, outline, and existing characters), generate a detailed profile for the new character requested by the user. Ensure the new character:
-    1. Has a role that complements the current plot.
-    2. Possesses a personality that contrasts or aligns meaningfully with existing characters.
-    3. Has a backstory that could logically intersect with the story's events.
-    4. Avoids duplicating the roles or core traits of existing characters.
+    Based *heavily* on the context provided (title, outline, and existing characters), generate a detailed profile for the new character requested by the user. Pay special attention to the "Story Outline" to define the character's purpose.
 
-    Provide a name, age, appearance, backstory, personality, and their potential role in the story.
+    **Requirements for the new character:**
+    1.  **Role in Story:** This is the most important part. Explicitly connect the character's role to specific plot points from the outline. For example, "They are the antagonist who triggers the events in 'The Inciting Incident', and their actions directly lead to 'The Climax'." The role must be integral to the provided plot.
+    2.  **Personality & Backstory:** Ensure their personality and backstory justify their role in the story.
+    3.  **Uniqueness:** The character must not duplicate the core traits or roles of existing characters.
+
+    Provide a name, age, appearance, backstory, personality, and their specific role in the story.
   `;
 
   try {
@@ -54,9 +56,9 @@ export const generateCharacter = async (
             name: { type: Type.STRING, description: "The character's full name." },
             age: { type: Type.STRING, description: "The character's age (can be a number or a description like 'ancient')." },
             appearance: { type: Type.STRING, description: "A detailed description of the character's physical appearance." },
-            backstory: { type: Type.STRING, description: "The character's history and background." },
+            backstory: { type: Type.STRING, description: "The character's history and background, justifying their role." },
             personality: { type: Type.STRING, description: "The character's key personality traits and temperament." },
-            roleInStory: { type: Type.STRING, description: "The character's role in the narrative (e.g., protagonist, antagonist, mentor)." }
+            roleInStory: { type: Type.STRING, description: "The character's specific role in the narrative, explicitly linked to the plot outline." }
           },
           required: ["name", "age", "appearance", "backstory", "personality", "roleInStory"],
         },
@@ -251,5 +253,44 @@ export const generateChapterContent = async (
   } catch (error) {
     console.error("Error generating chapter content:", error);
     throw new Error("Failed to generate chapter content from AI.");
+  }
+};
+
+export const summarizeChapter = async (
+  chapterTitle: string,
+  chapterContent: string
+): Promise<string> => {
+  if (!chapterContent) {
+    return "Chapter is empty.";
+  }
+
+  const contentForPrompt = chapterContent.length > 8000
+    ? `${chapterContent.substring(0, 8000)}... (content truncated)`
+    : chapterContent;
+
+  const contextPrompt = `
+    You are an expert AI editor. Your task is to provide a concise, one-paragraph summary of the following book chapter.
+    The summary should capture the key events, character developments, and plot advancements.
+
+    Chapter Title: "${chapterTitle}"
+
+    Chapter Content:
+    ---
+    ${contentForPrompt}
+    ---
+
+    Your Task:
+    Generate a single, well-written paragraph summarizing the chapter.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: contextPrompt,
+    });
+    return response.text.trim();
+  } catch (error) {
+    console.error("Error generating chapter summary:", error);
+    throw new Error("Failed to generate chapter summary from AI.");
   }
 };
