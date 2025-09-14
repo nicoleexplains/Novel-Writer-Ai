@@ -14,8 +14,11 @@ const AiHelperModal: React.FC<{
   onClose: () => void;
   onInsert: (text: string) => void;
   onReplace: (text: string) => void;
-}> = ({ novel, selectedChapter, onClose, onInsert, onReplace }) => {
+  wordCount: number;
+  previousPlotPointSummary: string | null;
+}> = ({ novel, selectedChapter, onClose, onInsert, onReplace, wordCount, previousPlotPointSummary }) => {
   const [aiPrompt, setAiPrompt] = useState('');
+  const [tone, setTone] = useState('');
   const [generatedText, setGeneratedText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +34,9 @@ const AiHelperModal: React.FC<{
         outline: novel.outline,
         characters: novel.characters,
         currentContent: selectedChapter.content,
+        currentWordCount: wordCount,
+        previousPlotPointSummary: previousPlotPointSummary,
+        tone: tone,
       };
       const result = await generateChapterContent(aiPrompt, novelContext);
       setGeneratedText(result);
@@ -69,6 +75,17 @@ const AiHelperModal: React.FC<{
               placeholder="e.g., Continue the story, focusing on the detective's inner conflict."
             />
           </div>
+          <div>
+            <label htmlFor="ai-tone" className="block text-sm font-medium text-slate-300 mb-2">Tone / Style (Optional)</label>
+            <input
+              id="ai-tone"
+              type="text"
+              value={tone}
+              onChange={(e) => setTone(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 text-slate-200 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="e.g., Suspenseful, humorous, formal"
+            />
+          </div>
           <button
             onClick={handleGenerate}
             disabled={isGenerating || !aiPrompt}
@@ -81,7 +98,7 @@ const AiHelperModal: React.FC<{
           
           {generatedText && (
             <div className="space-y-2">
-               <label className="block text-sm font-medium text-slate-300">Generated Text</label>
+               <label className="block text-sm font-medium text-slate-300">Preview</label>
                <div className="bg-slate-900 p-4 rounded-md border border-slate-700 max-h-60 overflow-y-auto">
                  <p className="text-slate-300 whitespace-pre-wrap font-serif">{generatedText}</p>
                </div>
@@ -113,6 +130,19 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedChapter = novel.chapters.find(c => c.id === selectedChapterId);
+
+  const wordCount = selectedChapter?.content
+    ? selectedChapter.content.trim().split(/\s+/).filter(Boolean).length
+    : 0;
+    
+  let previousPlotPointSummary: string | null = null;
+  if (selectedChapter) {
+      const chapterIndex = novel.chapters.findIndex(c => c.id === selectedChapter.id);
+      if (chapterIndex > 0 && novel.outline[chapterIndex - 1]) {
+          const prevPlotPoint = novel.outline[chapterIndex - 1];
+          previousPlotPointSummary = `Title: ${prevPlotPoint.title}\nDescription: ${prevPlotPoint.description}`;
+      }
+  }
 
   const handleAddChapter = () => {
     const newChapter: Chapter = {
@@ -236,6 +266,9 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel 
               className="flex-grow w-full p-6 bg-slate-900 text-slate-300 resize-none focus:outline-none leading-relaxed text-lg font-serif"
               placeholder="Start writing your story..."
             />
+            <footer className="p-2 border-t border-slate-700 text-right text-sm text-slate-400 flex-shrink-0">
+              <span>Word Count: {wordCount}</span>
+            </footer>
           </>
         ) : (
           <div className="flex-grow flex items-center justify-center text-slate-500">
@@ -250,6 +283,8 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel 
             onClose={() => setIsAiHelperOpen(false)}
             onInsert={handleInsertText}
             onReplace={handleReplaceText}
+            wordCount={wordCount}
+            previousPlotPointSummary={previousPlotPointSummary}
         />
       )}
     </div>

@@ -74,6 +74,9 @@ export const generateChapterContent = async (
     outline: PlotPoint[]; 
     characters: Character[]; 
     currentContent: string;
+    currentWordCount: number;
+    previousPlotPointSummary: string | null;
+    tone: string;
   }
 ): Promise<string> => {
   const contextPrompt = `
@@ -86,11 +89,16 @@ export const generateChapterContent = async (
     Story Outline:
     ${novelContext.outline.map(p => `- ${p.title}: ${p.description}`).join('\n') || 'No outline defined yet.'}
 
-    Current Chapter Content So Far:
+    ${novelContext.previousPlotPointSummary ? `Context from Previous Plot Point:\n${novelContext.previousPlotPointSummary}\n` : ''}
+
+    Current Chapter Progress:
+    - Word Count: ${novelContext.currentWordCount}
+    - Content So Far:
     ---
     ${novelContext.currentContent || "(This is the beginning of the chapter.)"}
     ---
 
+    ${novelContext.tone ? `Desired Tone/Style: ${novelContext.tone}\n` : ''}
     Based on all the context above, please fulfill the user's request: "${prompt}"
 
     Generate ONLY the requested story text. Do not add any commentary, introductions, or extra formatting.

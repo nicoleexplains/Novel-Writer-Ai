@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { Novel } from './types';
 import { View } from './types';
 import { ManuscriptView } from './components/ManuscriptView';
@@ -21,7 +21,7 @@ const Sidebar: React.FC<{ activeView: View; setActiveView: (view: View) => void 
   ];
 
   return (
-    <nav className="w-20 bg-slate-900 border-r border-slate-700 flex flex-col items-center py-6 space-y-6">
+    <nav className="w-20 bg-slate-900 border-r border-slate-700 flex flex-col items-center py-6 space-y-6 flex-shrink-0">
       <h1 className="text-xl font-bold text-indigo-400">NW</h1>
       <div className="flex flex-col space-y-4">
         {navItems.map(item => (
@@ -55,18 +55,23 @@ const App: React.FC = () => {
   });
 
   const [activeView, setActiveView] = useState<View>(View.MANUSCRIPT);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('novel-weaver-data', JSON.stringify(novel));
-    } catch (error) {
-      console.error("Failed to save novel data to localStorage", error);
-    }
-  }, [novel]);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   
   const handleSetNovel = useCallback((newNovelState: React.SetStateAction<Novel>) => {
       setNovel(newNovelState);
   }, []);
+  
+  const handleSaveNovel = () => {
+    setSaveStatus('saving');
+    try {
+      localStorage.setItem('novel-weaver-data', JSON.stringify(novel));
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000); // Reset status after 2 seconds
+    } catch (error) {
+      console.error("Failed to save novel data to localStorage", error);
+      setSaveStatus('idle'); // Reset on error
+    }
+  };
 
   const renderActiveView = () => {
     switch (activeView) {
@@ -80,12 +85,39 @@ const App: React.FC = () => {
         return null;
     }
   };
+  
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNovel(prevNovel => ({...prevNovel, title: e.target.value}));
+  }
 
   return (
     <div className="h-screen w-screen bg-slate-900 text-white flex font-sans">
       <Sidebar activeView={activeView} setActiveView={setActiveView} />
-      <main className="flex-grow h-full bg-slate-900">
-        {renderActiveView()}
+      <main className="flex-grow h-full flex flex-col">
+        <header className="px-6 py-4 border-b border-slate-700 flex-shrink-0 flex justify-between items-center gap-4">
+            <input
+                type="text"
+                value={novel.title}
+                onChange={handleTitleChange}
+                className="w-full bg-transparent text-3xl font-bold text-white placeholder-slate-500 focus:outline-none"
+                placeholder="Untitled Novel"
+                aria-label="Novel Title"
+            />
+            <button
+              onClick={handleSaveNovel}
+              className={`px-4 py-2 rounded-md font-semibold text-white transition-colors flex-shrink-0 w-32 ${
+                saveStatus === 'saved'
+                  ? 'bg-emerald-600 cursor-default'
+                  : 'bg-indigo-600 hover:bg-indigo-500'
+              } ${saveStatus === 'saving' ? 'bg-slate-600 cursor-not-allowed' : ''}`}
+              disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+            >
+              {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save Novel'}
+            </button>
+        </header>
+        <div className="flex-grow overflow-auto">
+            {renderActiveView()}
+        </div>
       </main>
     </div>
   );
