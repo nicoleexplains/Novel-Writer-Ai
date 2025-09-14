@@ -8,7 +8,8 @@ if (!process.env.API_KEY) {
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateCharacter = async (
-  prompt: string,
+  descriptionPrompt: string,
+  rolePrompt: string,
   novelContext: {
     title: string;
     outline: PlotPoint[];
@@ -29,19 +30,21 @@ export const generateCharacter = async (
 
     ---
 
-    **User's Request for a new character:** "${prompt}"
+    **User's Request:**
+    *   **Character Description:** "${descriptionPrompt}"
+    *   **Intended Role in Story:** "${rolePrompt}"
 
     ---
 
     **Your Task:**
-    Based *heavily* on the context provided (title, outline, and existing characters), generate a detailed profile for the new character requested by the user. Pay special attention to the "Story Outline" to define the character's purpose.
+    Based on the user's request and the provided novel context (title, outline, and existing characters), generate a detailed profile for the new character.
 
     **Requirements for the new character:**
-    1.  **Role in Story:** This is the most important part. Explicitly connect the character's role to specific plot points from the outline. For example, "They are the antagonist who triggers the events in 'The Inciting Incident', and their actions directly lead to 'The Climax'." The role must be integral to the provided plot.
-    2.  **Personality & Backstory:** Ensure their personality and backstory justify their role in the story.
+    1.  **Role in Story:** This is the most important part. Your primary goal is to flesh out the user's "Intended Role in Story" idea. Expand upon it and make it concrete by explicitly connecting it to specific plot points from the "Story Outline". For example, if the user wants an antagonist, explain *how* they trigger the inciting incident mentioned in the outline. The final role must be integral to the provided plot.
+    2.  **Personality & Backstory:** Ensure their personality and backstory are a perfect fit for the role you've defined.
     3.  **Uniqueness:** The character must not duplicate the core traits or roles of existing characters.
 
-    Provide a name, age, appearance, backstory, personality, and their specific role in the story.
+    Provide a name, age, appearance, backstory, personality, and their specific, detailed role in the story.
   `;
 
   try {
@@ -115,34 +118,40 @@ export const generateChapterDraft = async (
   }
 ): Promise<string> => {
   const contextPrompt = `
-    You are an AI writing assistant helping a novelist write a draft for a chapter.
-    Your task is to generate a compelling chapter draft that fits seamlessly into the story.
+    You are an AI writing assistant helping a novelist draft a chapter. Your task is to generate a compelling draft that fits perfectly within the story's context.
 
     **Novel Title:** ${novelContext.title}
+    **Chapter to Draft:** "${novelContext.chapterTitle}"
 
-    **Characters:**
-    ${novelContext.characters.map(c => `- ${c.name}: ${c.personality}. Role: ${c.roleInStory}`).join('\n') || 'No characters defined yet.'}
+    **Key Context for this Chapter:**
 
-    **Overall Story Outline:**
-    ${novelContext.outline.map(p => `- ${p.title}`).join('\n') || 'No outline defined yet.'}
+    1.  **Primary Goal (from the outline):** This chapter must accomplish the following:
+        ${novelContext.currentPlotPointSummary ? `${novelContext.currentPlotPointSummary}` : 'This chapter does not have a specific plot point assigned. Use the overall story context to guide its content.'}
 
-    **Previous Chapter's Context:**
-    ${novelContext.previousPlotPointSummary ? `The previous chapter likely covered:\n${novelContext.previousPlotPointSummary}\n` : 'This is an early chapter.'}
+    2.  **Author's Progress So Far:** You must build upon or continue directly from the text the author has already written:
+        ---
+        ${novelContext.currentContent || "(The chapter is currently empty. You will be writing the beginning.)"}
+        ---
 
-    **Current Chapter's Goal (based on outline):**
-    ${novelContext.currentPlotPointSummary ? `${novelContext.currentPlotPointSummary}\n` : `This chapter, titled "${novelContext.chapterTitle}", does not have a specific corresponding plot point in the outline. Use the overall story context to guide its content.`}
+    3.  **Leading Events (Previous Chapter's Context):** The story is coming from this point:
+        ${novelContext.previousPlotPointSummary || 'This is an early chapter, so establish the initial scene.'}
 
-    **Content written so far by the author (if any, continue from or incorporate it):**
-    ---
-    ${novelContext.currentContent || "(The chapter is currently empty.)"}
-    ---
+    **Supporting Context:**
+
+    *   **Characters Involved:**
+        ${novelContext.characters.map(c => `- ${c.name}: ${c.personality}. Role: ${c.roleInStory}`).join('\n') || 'No characters defined yet.'}
+
+    *   **Overall Story Arc (Full Outline):**
+        ${novelContext.outline.map(p => `- ${p.title}`).join('\n') || 'No outline defined yet.'}
 
     **Your Task:**
-    Based on all the context above, write a comprehensive draft for the chapter titled "${novelContext.chapterTitle}".
-    The draft should be engaging, well-paced, and consistent with the characters and plot.
-    If there's existing content, build upon it naturally to create a cohesive whole.
+    Based *specifically* on the **Key Context** provided above (the chapter's goal, the author's current text, and the previous events), write a comprehensive and engaging draft for the chapter "${novelContext.chapterTitle}". Use the supporting context (characters, full outline) to ensure consistency.
 
-    Generate ONLY the story text for the draft. Do not add any commentary, headings, or introductions like "Here is the draft:".
+    The draft should be well-paced and true to the established characters. If there is existing content, your draft must create a seamless continuation.
+
+    **Output Rules:**
+    - Generate ONLY the story text for the draft.
+    - Do not add any commentary, headings, or introductions like "Here is the draft:".
   `;
 
   try {

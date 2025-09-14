@@ -31,15 +31,15 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({ histor
                   </div>
                   <button
                     onClick={() => onRestore(version)}
-                    className="px-3 py-1.5 rounded-md bg-indigo-600 text-white font-semibold hover:bg-indigo-500"
+                    className="px-4 py-2 rounded-md bg-indigo-600 text-white font-semibold hover:bg-indigo-500"
                   >
-                    Restore
+                    Revert
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-slate-400 text-center py-8">No version history available. Versions are saved automatically every 5 minutes.</p>
+            <p className="text-slate-400 text-center py-8">No version history available. Click 'Save' in the header to create a version snapshot.</p>
           )}
         </div>
         <footer className="p-4 border-t border-slate-700 flex justify-end">

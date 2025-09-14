@@ -89,6 +89,7 @@ const CharacterDetailEditor: React.FC<{
 export const CharactersView: React.FC<CharactersViewProps> = ({ novel, setNovel }) => {
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(novel.characters[0]?.id || null);
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiRolePrompt, setAiRolePrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -110,7 +111,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({ novel, setNovel 
   };
   
   const handleGenerateCharacter = async () => {
-    if (!aiPrompt) return;
+    if (!aiPrompt || !aiRolePrompt) return;
     setIsGenerating(true);
     setError(null);
     try {
@@ -119,12 +120,13 @@ export const CharactersView: React.FC<CharactersViewProps> = ({ novel, setNovel 
         outline: novel.outline,
         characters: novel.characters,
       };
-      const characterData = await generateCharacter(aiPrompt, novelContext);
+      const characterData = await generateCharacter(aiPrompt, aiRolePrompt, novelContext);
       const newCharacter: Character = { ...characterData, id: Date.now().toString() };
       const updatedNovel = { ...novel, characters: [...novel.characters, newCharacter] };
       setNovel(updatedNovel);
       setSelectedCharacterId(newCharacter.id);
       setAiPrompt('');
+      setAiRolePrompt('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
@@ -165,22 +167,37 @@ export const CharactersView: React.FC<CharactersViewProps> = ({ novel, setNovel 
           </button>
         </div>
         
-        <div className="p-4 border-b border-slate-700 space-y-2">
+        <div className="p-4 border-b border-slate-700 space-y-3">
             <p className="text-sm font-medium text-slate-300">Generate with AI</p>
-            <textarea 
-              value={aiPrompt}
-              onChange={e => setAiPrompt(e.target.value)}
-              placeholder="e.g., A grizzled space detective with a dark past"
-              rows={2}
-              className="w-full bg-slate-800 border border-slate-600 rounded-md p-2 text-sm text-slate-200 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-            />
+            <div>
+              <label htmlFor="char-prompt" className="text-xs font-medium text-slate-400">Character Description</label>
+              <textarea 
+                id="char-prompt"
+                value={aiPrompt}
+                onChange={e => setAiPrompt(e.target.value)}
+                placeholder="e.g., A grizzled space detective with a dark past"
+                rows={2}
+                className="mt-1 w-full bg-slate-800 border border-slate-600 rounded-md p-2 text-sm text-slate-200 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+              />
+            </div>
+            <div>
+              <label htmlFor="role-prompt" className="text-xs font-medium text-slate-400">Role in Story Idea</label>
+              <textarea 
+                id="role-prompt"
+                value={aiRolePrompt}
+                onChange={e => setAiRolePrompt(e.target.value)}
+                placeholder="e.g., The antagonist who frames the hero for a crime"
+                rows={2}
+                className="mt-1 w-full bg-slate-800 border border-slate-600 rounded-md p-2 text-sm text-slate-200 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+              />
+            </div>
             <button
               onClick={handleGenerateCharacter}
-              disabled={isGenerating || !aiPrompt}
+              disabled={isGenerating || !aiPrompt || !aiRolePrompt}
               className="w-full flex justify-center items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-emerald-500"
             >
               <SparklesIcon />
-              {isGenerating ? 'Generating...' : 'Generate'}
+              {isGenerating ? 'Generating...' : 'Generate Character'}
             </button>
             {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
         </div>

@@ -10,6 +10,126 @@ interface ManuscriptViewProps {
   setNovel: React.Dispatch<React.SetStateAction<Novel>>;
 }
 
+const AiHelperModal: React.FC<{
+  novel: Novel;
+  chapter: Chapter;
+  onClose: () => void;
+  onReplace: (content: string) => void;
+  onAppend: (content: string) => void;
+}> = ({ novel, chapter, onClose, onReplace, onAppend }) => {
+  const [prompt, setPrompt] = useState('');
+  const [tone, setTone] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedText, setGeneratedText] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  
+  const wordCount = useMemo(() => chapter.content.split(/\s+/).filter(Boolean).length, [chapter.content]);
+  const chapterIndex = novel.chapters.findIndex(c => c.id === chapter.id);
+  const previousPlotPoint = chapterIndex > 0 ? novel.outline[chapterIndex - 1] : null;
+
+  const handleGenerate = async () => {
+    if (!prompt) return;
+    setIsGenerating(true);
+    setError(null);
+    setGeneratedText(null);
+    try {
+      const novelContext = {
+        title: novel.title,
+        outline: novel.outline,
+        characters: novel.characters,
+        currentContent: chapter.content,
+        currentWordCount: wordCount,
+        previousPlotPointSummary: previousPlotPoint ? `${previousPlotPoint.title}: ${previousPlotPoint.description}` : null,
+        tone: tone,
+      };
+      const newContent = await generateChapterContent(prompt, novelContext);
+      setGeneratedText(newContent);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50" role="dialog" aria-modal="true">
+      <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl border border-slate-700 max-h-[90vh] flex flex-col">
+        <header className="p-4 border-b border-slate-700 flex justify-between items-center flex-shrink-0">
+          <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2"><SparklesIcon /> AI Writing Assistant</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none" aria-label="Close">&times;</button>
+        </header>
+
+        <div className="p-6 flex-grow overflow-y-auto space-y-4">
+          <div>
+            <label htmlFor="ai-prompt" className="block text-sm font-medium text-slate-300 mb-1">Your Prompt</label>
+            <textarea
+              id="ai-prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="e.g., Describe the main character's reaction to the news."
+              rows={3}
+              className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 text-sm text-slate-200 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+            />
+          </div>
+          <div>
+            <label htmlFor="ai-tone" className="block text-sm font-medium text-slate-300 mb-1">Tone / Style (Optional)</label>
+            <input
+              id="ai-tone"
+              type="text"
+              value={tone}
+              onChange={(e) => setTone(e.target.value)}
+              placeholder="e.g., tense, humorous, melancholic"
+              className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 text-sm text-slate-200 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+           <button
+              onClick={handleGenerate}
+              disabled={isGenerating || !prompt}
+              className="w-full flex justify-center items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition-colors disabled:bg-slate-600"
+            >
+              <SparklesIcon />
+              {isGenerating ? 'Generating...' : 'Generate Text'}
+            </button>
+            {error && (
+             <div className="p-3 border border-red-500/50 bg-red-500/10 text-red-400 rounded-md text-sm">
+               <h5 className="font-bold">Generation Failed</h5>
+               <p>{error}</p>
+             </div>
+          )}
+          {generatedText && (
+            <div className="space-y-2 pt-4 border-t border-slate-700">
+              <h4 className="text-md font-semibold text-slate-300">Generated Text Preview:</h4>
+              <textarea
+                readOnly
+                value={generatedText}
+                rows={8}
+                className="w-full bg-slate-900 border border-slate-600 rounded-md p-3 text-slate-200 focus:ring-0 focus:border-slate-600 resize-y"
+              />
+            </div>
+          )}
+        </div>
+
+        <footer className="p-4 border-t border-slate-700 flex justify-end gap-3 flex-shrink-0">
+          <button onClick={onClose} className="px-4 py-2 rounded-md text-slate-300 bg-slate-700 hover:bg-slate-600">
+            Close
+          </button>
+          {generatedText && (
+            <>
+              <button onClick={() => onAppend(generatedText)} className="px-4 py-2 rounded-md font-semibold text-white bg-sky-600 hover:bg-sky-500">
+                Append Content
+              </button>
+              <button onClick={() => onReplace(generatedText)} className="px-4 py-2 rounded-md font-semibold text-white bg-indigo-600 hover:bg-indigo-500">
+                Replace Content
+              </button>
+            </>
+          )}
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+
 const TitleSuggestionModal: React.FC<{
   suggestions: string[];
   onSelect: (title: string) => void;
@@ -171,42 +291,13 @@ const ChapterEditor: React.FC<{
   onUpdate: (id: string, field: keyof Omit<Chapter, 'id' | 'summary'>, value: string) => void;
   onDelete: (id: string) => void;
   onOpenDraftModal: () => void;
-}> = ({ chapter, novel, onUpdate, onDelete, onOpenDraftModal }) => {
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [tone, setTone] = useState('');
-  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  onOpenAiHelperModal: () => void;
+}> = ({ chapter, novel, onUpdate, onDelete, onOpenDraftModal, onOpenAiHelperModal }) => {
   const [isSuggestingTitles, setIsSuggestingTitles] = useState(false);
   const [suggestedTitles, setSuggestedTitles] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const wordCount = useMemo(() => chapter.content.split(/\s+/).filter(Boolean).length, [chapter.content]);
-  
-  const chapterIndex = novel.chapters.findIndex(c => c.id === chapter.id);
-  const previousPlotPoint = chapterIndex > 0 ? novel.outline[chapterIndex - 1] : null;
-
-  const handleGenerateContent = async () => {
-    if (!aiPrompt) return;
-    setIsGeneratingContent(true);
-    setError(null);
-    try {
-      const novelContext = {
-        title: novel.title,
-        outline: novel.outline,
-        characters: novel.characters,
-        currentContent: chapter.content,
-        currentWordCount: wordCount,
-        previousPlotPointSummary: previousPlotPoint ? `${previousPlotPoint.title}: ${previousPlotPoint.description}` : null,
-        tone: tone,
-      };
-      const newContent = await generateChapterContent(aiPrompt, novelContext);
-      onUpdate(chapter.id, 'content', chapter.content ? `${chapter.content}\n\n${newContent}` : newContent);
-      setAiPrompt('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-    } finally {
-      setIsGeneratingContent(false);
-    }
-  };
 
   const handleSuggestTitles = async () => {
     if (!chapter.content) {
@@ -231,7 +322,7 @@ const ChapterEditor: React.FC<{
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col">
       {suggestedTitles && (
         <TitleSuggestionModal 
           suggestions={suggestedTitles}
@@ -239,7 +330,6 @@ const ChapterEditor: React.FC<{
           onClose={() => setSuggestedTitles(null)}
         />
       )}
-      <div className="flex-grow flex flex-col overflow-y-auto">
         <div className="p-6 flex-shrink-0 flex justify-between items-center border-b border-slate-700 gap-4">
             <div className="flex-grow flex items-center gap-2">
               <input
@@ -249,6 +339,14 @@ const ChapterEditor: React.FC<{
                 className="w-full bg-transparent text-2xl font-bold text-white focus:outline-none"
                 placeholder="Chapter Title"
               />
+              <button
+                onClick={onOpenAiHelperModal}
+                className="p-2 rounded-full text-slate-400 hover:bg-indigo-500/30 hover:text-indigo-300 transition-colors flex-shrink-0"
+                aria-label="Open AI writing assistant"
+                title="AI Writing Assistant"
+              >
+                <SparklesIcon className="h-5 w-5" />
+              </button>
               <button
                 onClick={handleSuggestTitles}
                 disabled={isSuggestingTitles || !chapter.content}
@@ -288,43 +386,6 @@ const ChapterEditor: React.FC<{
             Words: {wordCount}
           </span>
         </div>
-      </div>
-      <aside className="w-1/3 max-w-sm h-full bg-slate-800/50 border-l border-slate-700 flex flex-col">
-        <div className="p-4 border-b border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-200">AI Writing Tools</h3>
-        </div>
-        <div className="flex-grow p-4 space-y-6 overflow-y-auto">
-          <div>
-            <h4 className="flex items-center gap-2 text-md font-semibold text-slate-300 mb-2">
-              <QuillIcon className="h-5 w-5 text-indigo-400"/>
-              Continue Writing
-            </h4>
-            <textarea
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              placeholder="e.g., Describe the main character's reaction to the news."
-              rows={3}
-              className="w-full bg-slate-800 border border-slate-600 rounded-md p-2 text-sm text-slate-200 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-            />
-            <input
-              type="text"
-              value={tone}
-              onChange={(e) => setTone(e.target.value)}
-              placeholder="Optional: Specify tone (e.g., tense, humorous)"
-              className="mt-2 w-full bg-slate-800 border border-slate-600 rounded-md p-2 text-sm text-slate-200 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-            <button
-              onClick={handleGenerateContent}
-              disabled={isGeneratingContent || !aiPrompt}
-              className="mt-2 w-full flex justify-center items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition-colors disabled:bg-slate-600"
-            >
-              <SparklesIcon />
-              {isGeneratingContent ? 'Generating...' : 'Generate'}
-            </button>
-          </div>
-        </div>
-        {error && <div className="p-4 border-t border-red-500/50 bg-red-500/10 text-xs text-red-400">{error}</div>}
-      </aside>
     </div>
   );
 };
@@ -334,6 +395,7 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel 
   const [summarizing, setSummarizing] = useState<Record<string, boolean>>({});
   const [expandedSummaries, setExpandedSummaries] = useState<Record<string, boolean>>({});
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
+  const [isAiHelperModalOpen, setIsAiHelperModalOpen] = useState(false);
   
   const selectedChapter = novel.chapters.find(c => c.id === selectedChapterId);
 
@@ -482,6 +544,7 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel 
              onUpdate={handleChapterUpdate}
              onDelete={handleDeleteChapter}
              onOpenDraftModal={() => setIsDraftModalOpen(true)}
+             onOpenAiHelperModal={() => setIsAiHelperModalOpen(true)}
            />
         ) : (
           <div className="flex-grow flex items-center justify-center text-slate-500">
@@ -502,6 +565,23 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel 
           onAppend={(content) => {
             handleChapterUpdate(selectedChapter.id, 'content', content);
             setIsDraftModalOpen(false);
+          }}
+        />
+      )}
+
+      {isAiHelperModalOpen && selectedChapter && (
+        <AiHelperModal
+          novel={novel}
+          chapter={selectedChapter}
+          onClose={() => setIsAiHelperModalOpen(false)}
+          onReplace={(content) => {
+            handleChapterUpdate(selectedChapter.id, 'content', content);
+            setIsAiHelperModalOpen(false);
+          }}
+          onAppend={(content) => {
+            const newContent = selectedChapter.content ? `${selectedChapter.content}\n\n${content}` : content;
+            handleChapterUpdate(selectedChapter.id, 'content', newContent);
+            setIsAiHelperModalOpen(false);
           }}
         />
       )}
