@@ -112,7 +112,12 @@ export const CharactersView: React.FC<CharactersViewProps> = ({ novel, setNovel 
     setIsGenerating(true);
     setError(null);
     try {
-      const characterData = await generateCharacter(aiPrompt);
+      const novelContext = {
+        title: novel.title,
+        outline: novel.outline,
+        characters: novel.characters,
+      };
+      const characterData = await generateCharacter(aiPrompt, novelContext);
       const newCharacter: Character = { ...characterData, id: Date.now().toString() };
       const updatedNovel = { ...novel, characters: [...novel.characters, newCharacter] };
       setNovel(updatedNovel);

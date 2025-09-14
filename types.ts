@@ -32,3 +32,8 @@ export interface Novel {
   characters: Character[];
   outline: PlotPoint[];
 }
+
+export interface NovelVersion {
+  timestamp: number;
+  novel: Novel;
+}

@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { Novel, Chapter } from '../types';
-import { PlusIcon, TrashIcon, SparklesIcon } from './icons';
-import { generateChapterContent } from '../services/geminiService';
+import { PlusIcon, TrashIcon, SparklesIcon, QuillIcon, LightBulbIcon } from './icons';
+import { generateChapterContent, generateChapterDraft, generateChapterTitles } from '../services/geminiService';
 
 interface ManuscriptViewProps {
   novel: Novel;
@@ -121,12 +121,161 @@ const AiHelperModal: React.FC<{
   );
 };
 
+const AiDraftModal: React.FC<{
+  novel: Novel;
+  selectedChapter: Chapter;
+  onClose: () => void;
+  onReplace: (text: string) => void;
+  onAppend: (text: string) => void;
+  previousPlotPointSummary: string | null;
+  currentPlotPointSummary: string | null;
+}> = ({ novel, selectedChapter, onClose, onReplace, onAppend, previousPlotPointSummary, currentPlotPointSummary }) => {
+  const [draftText, setDraftText] = useState('');
+  const [isGenerating, setIsGenerating] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const generateDraft = async () => {
+      setIsGenerating(true);
+      setError(null);
+      try {
+        const novelContext = {
+          title: novel.title,
+          chapterTitle: selectedChapter.title,
+          outline: novel.outline,
+          characters: novel.characters,
+          currentContent: selectedChapter.content,
+          previousPlotPointSummary,
+          currentPlotPointSummary,
+        };
+        const result = await generateChapterDraft(novelContext);
+        setDraftText(result);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      } finally {
+        setIsGenerating(false);
+      }
+    };
+
+    generateDraft();
+  }, []); // Intentionally empty dependency array to run only on mount
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50" role="dialog" aria-modal="true">
+      <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-slate-700">
+        <header className="p-4 border-b border-slate-700 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+            <QuillIcon /> AI Chapter Draft
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none" aria-label="Close">&times;</button>
+        </header>
+        
+        <div className="p-6 flex-grow overflow-y-auto">
+          {isGenerating && (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+              <SparklesIcon className="h-10 w-10 text-emerald-400" />
+              <p className="mt-4 text-lg animate-pulse">Drafting your chapter...</p>
+              <p className="text-sm mt-1">This may take a moment.</p>
+            </div>
+          )}
+          {error && <p className="text-center p-4 bg-red-500/10 text-red-400 rounded-md" role="alert">{error}</p>}
+          {draftText && (
+             <div className="bg-slate-900 p-4 rounded-md border border-slate-700 h-full">
+               <p className="text-slate-300 whitespace-pre-wrap font-serif h-full overflow-y-auto">{draftText}</p>
+             </div>
+          )}
+        </div>
+
+        <footer className="p-4 border-t border-slate-700 bg-slate-800/50 flex justify-end gap-3">
+            <button onClick={onClose} className="px-4 py-2 rounded-md text-slate-300 bg-slate-700 hover:bg-slate-600">Discard</button>
+             {!isGenerating && draftText && (
+                 <>
+                    <button onClick={() => { onAppend(draftText); onClose(); }} className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-500">Append to Chapter</button>
+                    <button onClick={() => { onReplace(draftText); onClose(); }} className="px-4 py-2 rounded-md text-white bg-emerald-600 hover:bg-emerald-500">Replace Chapter Content</button>
+                 </>
+             )}
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+const TitleSuggestionModal: React.FC<{
+  novelTitle: string;
+  chapterContent: string;
+  onClose: () => void;
+  onSelectTitle: (title: string) => void;
+}> = ({ novelTitle, chapterContent, onClose, onSelectTitle }) => {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const titles = await generateChapterTitles(novelTitle, chapterContent);
+        setSuggestions(titles);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSuggestions();
+  }, [novelTitle, chapterContent]);
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50" role="dialog" aria-modal="true">
+      <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col border border-slate-700">
+        <header className="p-4 border-b border-slate-700 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+            <LightBulbIcon /> AI Title Suggestions
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none" aria-label="Close">&times;</button>
+        </header>
+
+        <div className="p-6 flex-grow overflow-y-auto">
+          {isLoading && (
+            <div className="flex items-center justify-center h-full text-slate-400">
+              <p className="animate-pulse">Generating ideas...</p>
+            </div>
+          )}
+          {error && <p className="text-center p-4 bg-red-500/10 text-red-400 rounded-md" role="alert">{error}</p>}
+          {!isLoading && suggestions.length > 0 && (
+            <div className="space-y-2">
+              {suggestions.map((title, index) => (
+                <button
+                  key={index}
+                  onClick={() => onSelectTitle(title)}
+                  className="w-full text-left p-3 rounded-md bg-slate-700/50 text-slate-200 hover:bg-indigo-600/30 hover:text-white transition-colors"
+                >
+                  {title}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <footer className="p-4 border-t border-slate-700 bg-slate-800/50 flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 rounded-md text-slate-300 bg-slate-700 hover:bg-slate-600">
+            Close
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
 
 export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel }) => {
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(
     novel.chapters[0]?.id || null
   );
   const [isAiHelperOpen, setIsAiHelperOpen] = useState(false);
+  const [isAiDraftModalOpen, setIsAiDraftModalOpen] = useState(false);
+  const [isTitleSuggestionOpen, setIsTitleSuggestionOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedChapter = novel.chapters.find(c => c.id === selectedChapterId);
@@ -136,11 +285,16 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel 
     : 0;
     
   let previousPlotPointSummary: string | null = null;
+  let currentPlotPointSummary: string | null = null;
   if (selectedChapter) {
       const chapterIndex = novel.chapters.findIndex(c => c.id === selectedChapter.id);
       if (chapterIndex > 0 && novel.outline[chapterIndex - 1]) {
           const prevPlotPoint = novel.outline[chapterIndex - 1];
           previousPlotPointSummary = `Title: ${prevPlotPoint.title}\nDescription: ${prevPlotPoint.description}`;
+      }
+      if (chapterIndex !== -1 && novel.outline[chapterIndex]) {
+          const currentPlotPoint = novel.outline[chapterIndex];
+          currentPlotPointSummary = `Title: ${currentPlotPoint.title}\nDescription: ${currentPlotPoint.description}`;
       }
   }
 
@@ -198,6 +352,13 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel 
       handleChapterChange('content', text);
   };
 
+  const handleAppendText = (text: string) => {
+    if (!selectedChapter) return;
+    const currentContent = selectedChapter.content;
+    const newContent = currentContent ? `${currentContent.trim()}\n\n${text}` : text;
+    handleChapterChange('content', newContent);
+  };
+
   return (
     <div className="flex h-full">
       {/* Chapter List */}
@@ -244,6 +405,21 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel 
               />
               <div className="flex items-center flex-shrink-0 gap-2">
                  <button
+                    onClick={() => setIsTitleSuggestionOpen(true)}
+                    disabled={!selectedChapter.content.trim()}
+                    className="p-2 rounded-md text-slate-400 hover:bg-amber-500/20 hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Suggest titles with AI"
+                 >
+                    <LightBulbIcon />
+                 </button>
+                 <button
+                    onClick={() => setIsAiDraftModalOpen(true)}
+                    className="p-2 rounded-md text-slate-400 hover:bg-blue-500/20 hover:text-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-blue-500"
+                    aria-label="Draft chapter with AI"
+                 >
+                    <QuillIcon />
+                 </button>
+                 <button
                     onClick={() => setIsAiHelperOpen(true)}
                     className="p-2 rounded-md text-slate-400 hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-emerald-500"
                     aria-label="AI Writing Assistant"
@@ -285,6 +461,28 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({ novel, setNovel 
             onReplace={handleReplaceText}
             wordCount={wordCount}
             previousPlotPointSummary={previousPlotPointSummary}
+        />
+      )}
+      {isAiDraftModalOpen && selectedChapter && (
+        <AiDraftModal
+            novel={novel}
+            selectedChapter={selectedChapter}
+            onClose={() => setIsAiDraftModalOpen(false)}
+            onAppend={handleAppendText}
+            onReplace={handleReplaceText}
+            previousPlotPointSummary={previousPlotPointSummary}
+            currentPlotPointSummary={currentPlotPointSummary}
+        />
+      )}
+      {isTitleSuggestionOpen && selectedChapter && (
+        <TitleSuggestionModal
+            novelTitle={novel.title}
+            chapterContent={selectedChapter.content}
+            onClose={() => setIsTitleSuggestionOpen(false)}
+            onSelectTitle={(title) => {
+                handleChapterChange('title', title);
+                setIsTitleSuggestionOpen(false);
+            }}
         />
       )}
     </div>

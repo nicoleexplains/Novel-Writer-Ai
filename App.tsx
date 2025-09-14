@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import type { Novel } from './types';
+import type { Novel, NovelVersion } from './types';
 import { View } from './types';
 import { ManuscriptView } from './components/ManuscriptView';
 import { CharactersView } from './components/CharactersView';
 import { OutlineView } from './components/OutlineView';
-import { BookIcon, UsersIcon, ListIcon } from './components/icons';
+import { VersionHistoryModal } from './components/VersionHistoryModal';
+import { BookIcon, UsersIcon, ListIcon, HistoryIcon, ExportIcon } from './components/icons';
 
 const initialNovel: Novel = {
   title: "Untitled Novel",
@@ -56,6 +57,7 @@ const App: React.FC = () => {
 
   const [activeView, setActiveView] = useState<View>(View.MANUSCRIPT);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   
   const handleSetNovel = useCallback((newNovelState: React.SetStateAction<Novel>) => {
       setNovel(newNovelState);
@@ -64,14 +66,56 @@ const App: React.FC = () => {
   const handleSaveNovel = () => {
     setSaveStatus('saving');
     try {
+      // Save current state
       localStorage.setItem('novel-weaver-data', JSON.stringify(novel));
+
+      // Update history
+      const historyString = localStorage.getItem('novel-weaver-history');
+      const history: NovelVersion[] = historyString ? JSON.parse(historyString) : [];
+      
+      const newVersion: NovelVersion = {
+        timestamp: Date.now(),
+        novel: novel,
+      };
+
+      // Add new version and keep only the last 20
+      const updatedHistory = [...history, newVersion].slice(-20);
+      localStorage.setItem('novel-weaver-history', JSON.stringify(updatedHistory));
+      
       setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2000); // Reset status after 2 seconds
+      setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       console.error("Failed to save novel data to localStorage", error);
-      setSaveStatus('idle'); // Reset on error
+      setSaveStatus('idle');
     }
   };
+  
+  const handleRevert = (historicalNovel: Novel) => {
+    setNovel(historicalNovel);
+    setIsHistoryModalOpen(false);
+    // Trigger a save of the reverted state to mark it as the current version
+    handleSaveNovel();
+  };
+  
+  const handleExportNovel = () => {
+    try {
+        const jsonString = JSON.stringify(novel, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const fileName = novel.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        link.href = url;
+        link.download = `${fileName || 'novel'}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    } catch(error) {
+        console.error("Failed to export novel:", error);
+        alert("Could not export the novel. See console for details.");
+    }
+  };
+
 
   const renderActiveView = () => {
     switch (activeView) {
@@ -103,22 +147,46 @@ const App: React.FC = () => {
                 placeholder="Untitled Novel"
                 aria-label="Novel Title"
             />
-            <button
-              onClick={handleSaveNovel}
-              className={`px-4 py-2 rounded-md font-semibold text-white transition-colors flex-shrink-0 w-32 ${
-                saveStatus === 'saved'
-                  ? 'bg-emerald-600 cursor-default'
-                  : 'bg-indigo-600 hover:bg-indigo-500'
-              } ${saveStatus === 'saving' ? 'bg-slate-600 cursor-not-allowed' : ''}`}
-              disabled={saveStatus === 'saving' || saveStatus === 'saved'}
-            >
-              {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save Novel'}
-            </button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                    onClick={handleExportNovel}
+                    className="p-2 rounded-md font-semibold text-slate-300 bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                    aria-label="Export novel"
+                >
+                    <ExportIcon />
+                    Export
+                </button>
+                <button
+                    onClick={() => setIsHistoryModalOpen(true)}
+                    className="p-2 rounded-md font-semibold text-slate-300 bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                    aria-label="View version history"
+                >
+                    <HistoryIcon />
+                    History
+                </button>
+                <button
+                  onClick={handleSaveNovel}
+                  className={`px-4 py-2 rounded-md font-semibold text-white transition-colors w-32 ${
+                    saveStatus === 'saved'
+                      ? 'bg-emerald-600 cursor-default'
+                      : 'bg-indigo-600 hover:bg-indigo-500'
+                  } ${saveStatus === 'saving' ? 'bg-slate-600 cursor-not-allowed' : ''}`}
+                  disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+                >
+                  {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save Novel'}
+                </button>
+            </div>
         </header>
         <div className="flex-grow overflow-auto">
             {renderActiveView()}
         </div>
       </main>
+      {isHistoryModalOpen && (
+        <VersionHistoryModal
+            onClose={() => setIsHistoryModalOpen(false)}
+            onRevert={handleRevert}
+        />
+      )}
     </div>
   );
 };

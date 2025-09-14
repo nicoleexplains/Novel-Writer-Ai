@@ -7,11 +7,45 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const generateCharacter = async (prompt: string): Promise<Omit<Character, 'id'>> => {
+export const generateCharacter = async (
+  prompt: string,
+  novelContext: {
+    title: string;
+    outline: PlotPoint[];
+    characters: Character[];
+  }
+): Promise<Omit<Character, 'id'>> => {
+  const contextPrompt = `
+    As an AI writing assistant, your task is to create a compelling new character for a novel. It's crucial that this character fits logically within the existing story.
+
+    **Novel Title:** ${novelContext.title}
+
+    **Story Outline Context:**
+    ${novelContext.outline.map(p => `- ${p.title}: ${p.description}`).join('\n') || 'No outline defined yet.'}
+
+    **Existing Characters Context:**
+    ${novelContext.characters.map(c => `- ${c.name}: ${c.personality}. Role: ${c.roleInStory}`).join('\n') || 'No other characters defined yet.'}
+
+    ---
+
+    **User's Request:** "${prompt}"
+
+    ---
+
+    **Your Task:**
+    Based *heavily* on the context provided (title, outline, and existing characters), generate a detailed profile for the new character requested by the user. Ensure the new character:
+    1. Has a role that complements the current plot.
+    2. Possesses a personality that contrasts or aligns meaningfully with existing characters.
+    3. Has a backstory that could logically intersect with the story's events.
+    4. Avoids duplicating the roles or core traits of existing characters.
+
+    Provide a name, age, appearance, backstory, personality, and their potential role in the story.
+  `;
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Generate a detailed character profile based on this prompt: "${prompt}". Provide a name, age, appearance, backstory, personality, and their role in the story.`,
+      contents: contextPrompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -66,6 +100,110 @@ export const generateOutline = async (prompt: string): Promise<Omit<PlotPoint, '
     throw new Error("Failed to generate story outline from AI.");
   }
 };
+
+export const generateChapterDraft = async (
+  novelContext: {
+    title: string;
+    chapterTitle: string;
+    outline: PlotPoint[];
+    characters: Character[];
+    currentContent: string;
+    previousPlotPointSummary: string | null;
+    currentPlotPointSummary: string | null;
+  }
+): Promise<string> => {
+  const contextPrompt = `
+    You are an AI writing assistant helping a novelist write a draft for a chapter.
+    Your task is to generate a compelling chapter draft that fits seamlessly into the story.
+
+    **Novel Title:** ${novelContext.title}
+
+    **Characters:**
+    ${novelContext.characters.map(c => `- ${c.name}: ${c.personality}. Role: ${c.roleInStory}`).join('\n') || 'No characters defined yet.'}
+
+    **Overall Story Outline:**
+    ${novelContext.outline.map(p => `- ${p.title}`).join('\n') || 'No outline defined yet.'}
+
+    **Previous Chapter's Context:**
+    ${novelContext.previousPlotPointSummary ? `The previous chapter likely covered:\n${novelContext.previousPlotPointSummary}\n` : 'This is an early chapter.'}
+
+    **Current Chapter's Goal (based on outline):**
+    ${novelContext.currentPlotPointSummary ? `${novelContext.currentPlotPointSummary}\n` : `This chapter, titled "${novelContext.chapterTitle}", does not have a specific corresponding plot point in the outline. Use the overall story context to guide its content.`}
+
+    **Content written so far by the author (if any, continue from or incorporate it):**
+    ---
+    ${novelContext.currentContent || "(The chapter is currently empty.)"}
+    ---
+
+    **Your Task:**
+    Based on all the context above, write a comprehensive draft for the chapter titled "${novelContext.chapterTitle}".
+    The draft should be engaging, well-paced, and consistent with the characters and plot.
+    If there's existing content, build upon it naturally to create a cohesive whole.
+
+    Generate ONLY the story text for the draft. Do not add any commentary, headings, or introductions like "Here is the draft:".
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: contextPrompt,
+    });
+    return response.text.trim();
+  } catch (error) {
+    console.error("Error generating chapter draft:", error);
+    throw new Error("Failed to generate chapter draft from AI.");
+  }
+};
+
+export const generateChapterTitles = async (
+  novelTitle: string,
+  chapterContent: string
+): Promise<string[]> => {
+  const contentForPrompt = chapterContent.length > 4000
+    ? `${chapterContent.substring(0, 4000)}... (content truncated)`
+    : chapterContent;
+
+  const contextPrompt = `
+    You are an AI writing assistant specializing in creating compelling titles.
+    Based on the content of this chapter from the novel titled "${novelTitle}", generate 5 alternative, engaging titles.
+
+    Chapter Content:
+    ---
+    ${contentForPrompt}
+    ---
+
+    Your Task:
+    Generate a list of 5 creative and relevant chapter titles. The titles should be concise and hint at the chapter's key events or themes.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: contextPrompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            titles: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "An array of 5 suggested chapter titles."
+            }
+          },
+          required: ["titles"]
+        },
+      },
+    });
+    const jsonString = response.text.trim();
+    const result = JSON.parse(jsonString);
+    return result.titles as string[];
+  } catch (error) {
+    console.error("Error generating chapter titles:", error);
+    throw new Error("Failed to generate chapter titles from AI.");
+  }
+};
+
 
 export const generateChapterContent = async (
   prompt: string, 
