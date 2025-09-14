@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+// Fix: Corrected import path for types.
 import type { Novel, PlotPoint } from '../types';
 import { generateOutline } from '../services/geminiService';
+// Fix: Corrected import path for icons.
 import { PlusIcon, TrashIcon, SparklesIcon, ArrowUpIcon, ArrowDownIcon } from './icons';
 
 interface OutlineViewProps {

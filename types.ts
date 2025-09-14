@@ -1,18 +1,6 @@
-export enum View {
-  MANUSCRIPT = 'MANUSCRIPT',
-  CHARACTERS = 'CHARACTERS',
-  OUTLINE = 'OUTLINE',
-}
-
-export interface Chapter {
-  id: string;
-  title: string;
-  content: string;
-  summary?: string;
-}
-
+// Defining the core data structures for the application.
 export interface Character {
-  id:string;
+  id: string;
   name: string;
   age: string;
   appearance: string;
@@ -27,14 +15,23 @@ export interface PlotPoint {
   description: string;
 }
 
-export interface Novel {
+export interface Chapter {
+  id: string;
   title: string;
-  chapters: Chapter[];
-  characters: Character[];
-  outline: PlotPoint[];
+  content: string;
+  summary?: string;
 }
 
 export interface NovelVersion {
   timestamp: number;
-  novel: Novel;
+  novel: Omit<Novel, 'versionHistory'>;
+}
+
+export interface Novel {
+  id: string;
+  title: string;
+  outline: PlotPoint[];
+  characters: Character[];
+  chapters: Chapter[];
+  versionHistory: NovelVersion[];
 }

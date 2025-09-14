@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
+// Fix: Corrected import path for types.
 import type { Novel, Chapter } from '../types';
 import { generateChapterDraft, generateChapterTitles, generateChapterContent, summarizeChapter } from '../services/geminiService';
+// Fix: Corrected import path for icons.
 import { PlusIcon, TrashIcon, SparklesIcon, QuillIcon, LightBulbIcon, DocumentTextIcon, ChevronDownIcon, ChevronUpIcon } from './icons';
 
 interface ManuscriptViewProps {

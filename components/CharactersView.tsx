@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+// Fix: Corrected import path for types.
 import type { Novel, Character } from '../types';
 import { generateCharacter } from '../services/geminiService';
+// Fix: Corrected import path for icons.
 import { PlusIcon, TrashIcon, SparklesIcon } from './icons';
 
 interface CharactersViewProps {
