@@ -1,0 +1,94 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import type { Novel } from './types';
+import { View } from './types';
+import { ManuscriptView } from './components/ManuscriptView';
+import { CharactersView } from './components/CharactersView';
+import { OutlineView } from './components/OutlineView';
+import { BookIcon, UsersIcon, ListIcon } from './components/icons';
+
+const initialNovel: Novel = {
+  title: "Untitled Novel",
+  chapters: [],
+  characters: [],
+  outline: [],
+};
+
+const Sidebar: React.FC<{ activeView: View; setActiveView: (view: View) => void }> = ({ activeView, setActiveView }) => {
+  const navItems = [
+    { view: View.MANUSCRIPT, label: 'Manuscript', icon: <BookIcon /> },
+    { view: View.CHARACTERS, label: 'Characters', icon: <UsersIcon /> },
+    { view: View.OUTLINE, label: 'Outline', icon: <ListIcon /> },
+  ];
+
+  return (
+    <nav className="w-20 bg-slate-900 border-r border-slate-700 flex flex-col items-center py-6 space-y-6">
+      <h1 className="text-xl font-bold text-indigo-400">NW</h1>
+      <div className="flex flex-col space-y-4">
+        {navItems.map(item => (
+          <button
+            key={item.view}
+            onClick={() => setActiveView(item.view)}
+            className={`p-3 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 ${
+              activeView === item.view
+                ? 'bg-indigo-600 text-white'
+                : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+            }`}
+            aria-label={item.label}
+          >
+            {item.icon}
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+};
+
+const App: React.FC = () => {
+  const [novel, setNovel] = useState<Novel>(() => {
+    try {
+      const savedNovel = localStorage.getItem('novel-weaver-data');
+      return savedNovel ? JSON.parse(savedNovel) : initialNovel;
+    } catch (error) {
+      console.error("Failed to parse novel data from localStorage", error);
+      return initialNovel;
+    }
+  });
+
+  const [activeView, setActiveView] = useState<View>(View.MANUSCRIPT);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('novel-weaver-data', JSON.stringify(novel));
+    } catch (error) {
+      console.error("Failed to save novel data to localStorage", error);
+    }
+  }, [novel]);
+  
+  const handleSetNovel = useCallback((newNovelState: React.SetStateAction<Novel>) => {
+      setNovel(newNovelState);
+  }, []);
+
+  const renderActiveView = () => {
+    switch (activeView) {
+      case View.MANUSCRIPT:
+        return <ManuscriptView novel={novel} setNovel={handleSetNovel} />;
+      case View.CHARACTERS:
+        return <CharactersView novel={novel} setNovel={handleSetNovel} />;
+      case View.OUTLINE:
+        return <OutlineView novel={novel} setNovel={handleSetNovel} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="h-screen w-screen bg-slate-900 text-white flex font-sans">
+      <Sidebar activeView={activeView} setActiveView={setActiveView} />
+      <main className="flex-grow h-full bg-slate-900">
+        {renderActiveView()}
+      </main>
+    </div>
+  );
+};
+
+export default App;
